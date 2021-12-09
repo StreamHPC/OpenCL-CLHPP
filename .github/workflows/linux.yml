@@ -44,7 +44,7 @@ jobs:
     - name: Create Build Environment
       run: sudo apt-get update -q;
         if [[ "${{matrix.GEN}}" =~ "Ninja" && ! `which ninja` ]]; then sudo apt install -y ninja-build; fi;
-        sudo apt install gcc-${{matrix.VER}} g++-${matrix.VER}; 
+        sudo apt install gcc-${{matrix.VER}} g++-${{matrix.VER}}; 
         if [[ "${{matrix.BIN}}" == "32" ]];
         then sudo apt install gcc-${COMPILER_VER}-multilib;
         fi;
