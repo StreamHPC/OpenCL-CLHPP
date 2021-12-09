@@ -98,7 +98,7 @@ jobs:
       # no -Werror during configuration because:
       # warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
       # warning: unused parameter [-Wunused-parameter]
-      run: ;[[ "${{matrix.COMPILER}}" =~ ([0-9]+) ]]; COMPILER_VER=${BASH_REMATCH[1]};
+      run: :[[ "${{matrix.COMPILER}}" =~ ([0-9]+) ]]; COMPILER_VER=${BASH_REMATCH[1]};
         $CMAKE_EXE
         -G "${{matrix.GEN}}"
         -D BUILD_TESTS=ON
