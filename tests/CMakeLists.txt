@@ -142,7 +142,7 @@ foreach(VERSION ${VERSIONS})
         ${CMOCK_DIR}/src
     )
     target_compile_definitions(${TEST_EXE}
-        PUBLIC -DCL_HPP_TARGET_OPENCL_VERSION=${VERSION} ${DEFINE_OPTION}
+        PUBLIC -DCL_TARGET_OPENCL_VERSION=${VERSION} -DCL_HPP_TARGET_OPENCL_VERSION=${VERSION} ${DEFINE_OPTION}
     )
     add_dependencies(${TEST_EXE}
         strip_cl_defines
