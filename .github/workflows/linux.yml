@@ -168,16 +168,15 @@ jobs:
 
 
   cmake-latest:
-    if: false
     runs-on: ${{ matrix.OS }}
     strategy:
       matrix:
         OS : [ubuntu-20.04]
-        COMPILER: [gcc-9, gcc-11, clang-11, clang-13]
+        VER: [9, 11] # clang-11, clang-13
         EXT: [ON] # OFF = icd_linux.c:66 error: ‘DT_UNKNOWN’ undeclared (first use in this function)
         GEN: [Ninja Multi-Config]
-        STD: [99, 11, 17]
-        BIN: [32, 64]
+        STD: [11, 14]
+        BIN: [64] # Temporarily disable cross-compilation (will need toolchain files)
         CMAKE: [3.21.2]
     env:
       CMAKE_URL: https://github.com/Kitware/CMake/releases/download/v${{ matrix.CMAKE }}/cmake-${{ matrix.CMAKE }}-Linux-x86_64.tar.gz
@@ -186,8 +185,10 @@ jobs:
 
 
     steps:
-    - name: Checkout OpenCL-ICD-Loader
+    - name: Checkout OpenCL-CLHPP
       uses: actions/checkout@v2
+      with:
+        submodules: recursive
 
     - name: Checkout OpenCL-Headers
       uses: actions/checkout@v2
@@ -195,14 +196,21 @@ jobs:
         repository: KhronosGroup/OpenCL-Headers
         path: external/OpenCL-Headers
 
+    - name: Checkout OpenCL-ICD-Loader
+      uses: actions/checkout@v2
+      with:
+        repository: StreamHPC/OpenCL-ICD-Loader
+        ref: develop_stream
+        path: external/OpenCL-ICD-Loader
+      # Temporary redirection to external repo. Changes needed from there.
+
     - name: Create Build Environment
       run: sudo apt-get update -q;
         if [[ "${{matrix.GEN}}" =~ "Ninja" && ! `which ninja` ]]; then sudo apt install -y ninja-build; fi;
-        if [[ "${{matrix.COMPILER}}" =~ "gcc-11" ]]; then sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test; fi;
-        if [[ "${{matrix.COMPILER}}" =~ "clang-13" ]]; then wget -q -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -; sudo apt-add-repository -y 'deb [arch=amd64] https://apt.llvm.org/focal/ llvm-toolchain-focal-13 main'; fi;
-        sudo apt install -y ${{matrix.COMPILER}};
-        if [[ "${{matrix.BIN}}" == "32" && "${{matrix.COMPILER}}" =~ "gcc" ]]; then sudo apt install -y ${{matrix.COMPILER}}-multilib; fi;
-        if [[ "${{matrix.BIN}}" == "32" && "${{matrix.COMPILER}}" =~ "clang" ]]; then sudo apt install -y gcc-multilib ; fi;
+        sudo apt install gcc-${{matrix.VER}} g++-${{matrix.VER}}; 
+        if [[ "${{matrix.BIN}}" == "32" ]];
+        then sudo apt install gcc-${COMPILER_VER}-multilib;
+        fi;
         mkdir -p /opt/Kitware/CMake;
         wget -c $CMAKE_URL -O - | tar -xz --directory /opt/Kitware/CMake;
         mv /opt/Kitware/CMake/cmake-${{ matrix.CMAKE }}-* /opt/Kitware/CMake/${{ matrix.CMAKE }}
@@ -212,13 +220,30 @@ jobs:
       run: $CMAKE_EXE
         -G "${{matrix.GEN}}"
         -D CMAKE_C_FLAGS="-w -m${{matrix.BIN}}"
-        -D CMAKE_C_COMPILER=${{matrix.COMPILER}}
-        -D CMAKE_C_STANDARD=${{matrix.STD}}
+        -D CMAKE_C_COMPILER=gcc-${{matrix.VER}}
+        -D CMAKE_C_EXTENSIONS=${{matrix.EXT}}
         -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
-        -B $GITHUB_WORKSPACE/external/OpenCL-Headers/build
-        -S $GITHUB_WORKSPACE/external/OpenCL-Headers;
+        -B$GITHUB_WORKSPACE/external/OpenCL-Headers/build
+        -H$GITHUB_WORKSPACE/external/OpenCL-Headers &&
         $CMAKE_EXE
         --build $GITHUB_WORKSPACE/external/OpenCL-Headers/build
+        --target install
+        --config Release
+        --
+        -j`nproc`
+
+    - name: Build & install OpenCL-ICD-Loader
+      run: $CMAKE_EXE
+        -G "${{matrix.GEN}}"
+        -D CMAKE_C_FLAGS="-w -m${{matrix.BIN}}"
+        -D CMAKE_C_COMPILER=gcc-${{matrix.VER}}
+        -D CMAKE_C_EXTENSIONS=${{matrix.EXT}}
+        -D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
+        -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install
+        -B$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build
+        -H$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader &&
+        $CMAKE_EXE
+        --build $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build
         --target install
         --config Release
         --
