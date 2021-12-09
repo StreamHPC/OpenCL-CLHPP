@@ -256,14 +256,16 @@ jobs:
       # warning: unused parameter [-Wunused-parameter]
       run: $CMAKE_EXE
         -G "${{matrix.GEN}}"
-        -D BUILD_TESTING=ON
-        -D CMAKE_C_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
-        -D CMAKE_C_COMPILER=${{matrix.COMPILER}}
-        -D CMAKE_C_STANDARD=${{matrix.STD}}
+        -D BUILD_TESTS=ON
+        -D BUILD_EXAMPLES=ON
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
+        -D CMAKE_CXX_COMPILER=g++-${{matrix.VER}}
+        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_EXTENSIONS=${{matrix.EXT}}
         -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
-        -D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
-        -B $GITHUB_WORKSPACE/build
-        -S $GITHUB_WORKSPACE
+        -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install"
+        -B$GITHUB_WORKSPACE/build
+        -H$GITHUB_WORKSPACE
 
     - name: Build
       shell: bash
@@ -291,13 +293,13 @@ jobs:
       shell: bash
       run: $CMAKE_EXE
         -G "${{matrix.GEN}}"
-        -D CMAKE_C_COMPILER=${{matrix.COMPILER}}
-        -D CMAKE_C_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
-        -D CMAKE_C_STANDARD=${{matrix.STD}}
-        -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/install"
-        -D DRIVER_STUB_PATH=$GITHUB_WORKSPACE/build/Release/libOpenCLDriverStub.so
-        -B $GITHUB_WORKSPACE/build/downstream/bare
-        -S $GITHUB_WORKSPACE/test/pkgconfig/bare;
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
+        -D CMAKE_CXX_COMPILER=g++-${{matrix.VER}}
+        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_EXTENSIONS=${{matrix.EXT}}
+        -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install;$GITHUB_WORKSPACE/install"
+        -B$GITHUB_WORKSPACE/build/downstream/bare
+        -H$GITHUB_WORKSPACE/tests/pkgconfig/bare ;
         $CMAKE_EXE --build $GITHUB_WORKSPACE/build/downstream/bare --config Release;
         $CMAKE_EXE --build $GITHUB_WORKSPACE/build/downstream/bare --config Debug;
         cd $GITHUB_WORKSPACE/build/downstream/bare;
@@ -310,13 +312,13 @@ jobs:
         echo -e 'include("/home/runner/work/OpenCL-ICD-Loader/OpenCL-ICD-Loader/external/OpenCL-Headers/install/share/cmake/OpenCLHeaders/OpenCLHeadersTargets.cmake")\ninclude("${CMAKE_CURRENT_LIST_DIR}/../OpenCLICDLoader/OpenCLICDLoaderTargets.cmake")' > $GITHUB_WORKSPACE/install/share/cmake/OpenCL/OpenCLConfig.cmake ;
         $CMAKE_EXE
         -G "${{matrix.GEN}}"
-        -D CMAKE_C_COMPILER=${{matrix.COMPILER}}
-        -D CMAKE_C_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
-        -D CMAKE_C_STANDARD=${{matrix.STD}}
-        -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/install"
-        -D DRIVER_STUB_PATH=$GITHUB_WORKSPACE/build/Release/libOpenCLDriverStub.so
-        -B $GITHUB_WORKSPACE/build/downstream/sdk
-        -S $GITHUB_WORKSPACE/test/pkgconfig/sdk;
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
+        -D CMAKE_CXX_COMPILER=g++-${{matrix.VER}}
+        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_EXTENSIONS=${{matrix.EXT}}
+        -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install;$GITHUB_WORKSPACE/install"
+        -B$GITHUB_WORKSPACE/build/downstream/sdk
+        -H$GITHUB_WORKSPACE/tests/pkgconfig/sdk ;
         $CMAKE_EXE --build $GITHUB_WORKSPACE/build/downstream/sdk --config Release;
         $CMAKE_EXE --build $GITHUB_WORKSPACE/build/downstream/sdk --config Debug;
         cd $GITHUB_WORKSPACE/build/downstream/sdk;
