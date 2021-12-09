@@ -8,7 +8,7 @@ jobs:
     strategy:
       matrix:
         OS: [ubuntu-18.04]
-        COMPILER: [gcc-7, gcc-8, clang-8, clang-10]
+        VER: [7, 8] # clang-8, clang-10
         EXT: [ON] # OFF = icd_linux.c:66 error: ‘DT_UNKNOWN’ undeclared (first use in this function)
         GEN: [Unix Makefiles]
         CONFIG: [Debug, Release]
@@ -44,16 +44,9 @@ jobs:
     - name: Create Build Environment
       run: sudo apt-get update -q;
         if [[ "${{matrix.GEN}}" =~ "Ninja" && ! `which ninja` ]]; then sudo apt install -y ninja-build; fi;
-        [[ "${{matrix.COMPILER}}" =~ ([0-9]+) ]]; COMPILER_VER=${BASH_REMATCH[1]};
-        if [[ "${{matrix.COMPILER}}" =~ "gcc" ]];
-        then sudo apt install ${{matrix.COMPILER}} g++-${COMPILER_VER};
+        sudo apt install gcc-${{matrix.VER}} g++-${matrix.VER}; 
         if [[ "${{matrix.BIN}}" == "32" ]];
         then sudo apt install gcc-${COMPILER_VER}-multilib;
-        fi;
-        else sudo apt install ${{matrix.COMPILER}};
-        if [[ "${{matrix.BIN}}" == "32" ]];
-        then sudo apt install gcc-multilib;
-        fi;
         fi;
         mkdir -p /opt/Kitware/CMake;
         wget -c $CMAKE_URL -O - | tar -xz --directory /opt/Kitware/CMake;
@@ -65,7 +58,7 @@ jobs:
         -G "${{matrix.GEN}}"
         -D CMAKE_BUILD_TYPE=${{matrix.CONFIG}}
         -D CMAKE_C_FLAGS="-w -m${{matrix.BIN}}"
-        -D CMAKE_C_COMPILER=${{matrix.COMPILER}}
+        -D CMAKE_C_COMPILER=gcc-${{matrix.VER}}
         -D CMAKE_C_EXTENSIONS=${{matrix.EXT}}
         -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
         -B$GITHUB_WORKSPACE/external/OpenCL-Headers/build
@@ -81,7 +74,7 @@ jobs:
         -G "${{matrix.GEN}}"
         -D CMAKE_BUILD_TYPE=${{matrix.CONFIG}}
         -D CMAKE_C_FLAGS="-w -m${{matrix.BIN}}"
-        -D CMAKE_C_COMPILER=${{matrix.COMPILER}}
+        -D CMAKE_C_COMPILER=gcc-${{matrix.VER}}
         -D CMAKE_C_EXTENSIONS=${{matrix.EXT}}
         -D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
         -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install
@@ -98,14 +91,14 @@ jobs:
       # no -Werror during configuration because:
       # warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
       # warning: unused parameter [-Wunused-parameter]
-      run: :[[ "${{matrix.COMPILER}}" =~ "([0-9]+)" ]]; COMPILER_VER=${BASH_REMATCH[1]};
+      run: 
         $CMAKE_EXE
         -G "${{matrix.GEN}}"
         -D BUILD_TESTS=ON
         -D BUILD_EXAMPLES=ON
         -D CMAKE_BUILD_TYPE=${{matrix.CONFIG}}
         -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
-        -D CMAKE_CXX_COMPILER=`if [[ "${{matrix.COMPILER}}" =~ "gcc" ]]; then echo g++-${COMPILER_VER}; else clang++-${COMPILER_VER}; fi`
+        -D CMAKE_CXX_COMPILER=g++-${{matrix.VER}}
         -D CMAKE_CXX_STANDARD=${{matrix.STD}}
         -D CMAKE_CXX_EXTENSIONS=${{matrix.EXT}}
         -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
@@ -140,7 +133,7 @@ jobs:
         -G "${{matrix.GEN}}"
         -D CMAKE_BUILD_TYPE=${{matrix.CONFIG}}
         -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
-        -D CMAKE_CXX_COMPILER=`if [[ "${{matrix.COMPILER}}" =~ "gcc" ]]; then echo g++-${COMPILER_VER}; else clang++-${COMPILER_VER}; fi`
+        -D CMAKE_CXX_COMPILER=g++-${{matrix.VER}}
         -D CMAKE_CXX_STANDARD=${{matrix.STD}}
         -D CMAKE_CXX_EXTENSIONS=${{matrix.EXT}}
         -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install;$GITHUB_WORKSPACE/install"
@@ -160,7 +153,7 @@ jobs:
         -G "${{matrix.GEN}}"
         -D CMAKE_BUILD_TYPE=${{matrix.CONFIG}}
         -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
-        -D CMAKE_CXX_COMPILER=`if [[ "${{matrix.COMPILER}}" =~ "gcc" ]]; then echo g++-${COMPILER_VER}; else clang++-${COMPILER_VER}; fi`
+        -D CMAKE_CXX_COMPILER=g++-${{matrix.VER}}
         -D CMAKE_CXX_STANDARD=${{matrix.STD}}
         -D CMAKE_CXX_EXTENSIONS=${{matrix.EXT}}
         -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/install"
