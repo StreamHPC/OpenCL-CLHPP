@@ -12,7 +12,7 @@ jobs:
         EXT: [ON] # OFF: error C2079: 'statbuf' uses undefined struct 'stat'
         GEN: [Visual Studio 17 2022, Ninja Multi-Config]
         BIN: [x64, x86]
-        STD: [90, 11, 17]
+        STD: [11, 17]
         CMAKE: [3.22.0]
     env:
       CMAKE_URL: https://github.com/Kitware/CMake/releases/download/v${{matrix.CMAKE}}/cmake-${{matrix.CMAKE}}-windows-x86_64.zip
