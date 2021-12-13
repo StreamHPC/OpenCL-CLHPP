@@ -1,6 +1,6 @@
 foreach(EXAMPLE IN ITEMS
   trivial
-  trivialSizeTCompat
+  #trivialSizeTCompat
   headerexample
 )
   add_executable(${EXAMPLE} ${EXAMPLE}.cpp)
