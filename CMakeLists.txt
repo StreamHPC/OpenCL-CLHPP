@@ -37,6 +37,8 @@ target_include_directories(HeadersCpp
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(HeadersCpp
+  SYSTEM
+  BEFORE
   INTERFACE
     OpenCL::Headers
 )
