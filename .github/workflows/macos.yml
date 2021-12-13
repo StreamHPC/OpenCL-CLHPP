@@ -103,7 +103,7 @@ jobs:
         cmake --build $GITHUB_WORKSPACE/build --config Debug --parallel `sysctl -n hw.logicalcpu`
 
     - name: Test
-      working-directory: ${{runner.workspace}}/OpenCL-ICD-Loader/build
+      working-directory: ${{runner.workspace}}/OpenCL-CLHPP/build
       shell: bash
       run: |
         ctest -C Release --output-on-failure --parallel `sysctl -n hw.logicalcpu`
