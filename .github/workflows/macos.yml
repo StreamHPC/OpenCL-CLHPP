@@ -9,7 +9,7 @@ jobs:
       matrix:
         VER: [9, 11]
         EXT: [ON, OFF]
-        GEN: [Xcode, Ninja Multi-Config]
+        GEN: [Ninja Multi-Config] # Xcode
         STD: [11, 17] # 90 results in errors 
 
     steps:
