@@ -58,7 +58,7 @@ jobs:
     - name: Build & install OpenCL-ICD-Loader
       run: cmake
         -G "${{matrix.GEN}}"
-        -D CMAKE_C_FLAGS="-w"
+        -D CMAKE_C_FLAGS="-w -m64"
         -D CMAKE_C_COMPILER=/usr/local/bin/gcc-${{matrix.VER}}
         -D CMAKE_C_EXTENSIONS=${{matrix.EXT}}
         -D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
@@ -79,7 +79,7 @@ jobs:
       run: cmake
         -G "${{matrix.GEN}}"
         -D BUILD_TESTING=ON
-        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Wno-format"
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Wno-format -m64"
         -D CMAKE_CXX_COMPILER=/usr/local/bin/gcc-${{matrix.VER}}
         -D CMAKE_CXX_STANDARD=${{matrix.STD}}
         -D CMAKE_CXX_EXTENSIONS=${{matrix.EXT}}
@@ -125,7 +125,7 @@ jobs:
       shell: bash
       run: cmake
         -G "${{matrix.GEN}}"
-        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m64"
         -D CMAKE_CXX_COMPILER=g++-${{matrix.VER}}
         -D CMAKE_CXX_STANDARD=${{matrix.STD}}
         -D CMAKE_CXX_EXTENSIONS=${{matrix.EXT}}
@@ -144,7 +144,7 @@ jobs:
         echo -e 'include("/home/runner/work/OpenCL-CLHPP/OpenCL-CLHPP/external/OpenCL-Headers/install/share/cmake/OpenCLHeaders/OpenCLHeadersTargets.cmake")\ninclude("/home/runner/work/OpenCL-CLHPP/OpenCL-CLHPP/external/OpenCL-ICD-Loader/install/share/cmake/OpenCLICDLoader/OpenCLICDLoaderTargets.cmake")\ninclude("${CMAKE_CURRENT_LIST_DIR}/../OpenCLHeadersCpp/OpenCLHeadersCppTargets.cmake")' > $GITHUB_WORKSPACE/install/share/cmake/OpenCL/OpenCLConfig.cmake ;
         cmake
         -G "${{matrix.GEN}}"
-        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m64"
         -D CMAKE_CXX_COMPILER=g++-${{matrix.VER}}
         -D CMAKE_CXX_STANDARD=${{matrix.STD}}
         -D CMAKE_CXX_EXTENSIONS=${{matrix.EXT}}
