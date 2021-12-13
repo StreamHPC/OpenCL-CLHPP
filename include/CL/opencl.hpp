@@ -536,7 +536,7 @@
 
 #if defined(__APPLE__) || defined(__MACOSX)
 # pragma message("And here.")
-#include <OpenCL/opencl.h>
+#include <CL/opencl.h>
 #else
 # pragma message("Or here.")
 #include <CL/opencl.h>
