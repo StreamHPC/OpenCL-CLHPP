@@ -10,7 +10,7 @@ jobs:
         VER: [9, 11]
         EXT: [ON, OFF]
         GEN: [Xcode, Ninja Multi-Config]
-        STD: [14, 17]
+        STD: [11, 17]
 
     steps:
     - name: Checkout OpenCL-CLHPP
