@@ -532,13 +532,9 @@
 #include <CL/cl_ext.h>
 #endif
 
-# pragma message("I was here.")
-
 #if defined(__APPLE__) || defined(__MACOSX)
-# pragma message("And here.")
 #include <CL/opencl.h>
 #else
-# pragma message("Or here.")
 #include <CL/opencl.h>
 #endif // !__APPLE__
 
