@@ -533,7 +533,7 @@
 #endif
 
 #if defined(__APPLE__) || defined(__MACOSX)
-#include <CL/opencl.h>
+#include <OpenCL/opencl.h>
 #else
 #include <CL/opencl.h>
 #endif // !__APPLE__
