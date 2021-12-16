@@ -53,7 +53,10 @@ jobs:
         --build $GITHUB_WORKSPACE/external/OpenCL-Headers/build
         --target install
         --config Release
-        --parallel `sysctl -n hw.logicalcpu`
+        --parallel `sysctl -n hw.logicalcpu` &&
+        ls -al $GITHUB_WORKSPACE/external/OpenCL-Headers/install &&
+        ls -al $GITHUB_WORKSPACE/external/OpenCL-Headers/install/CL &&
+        ls -al $GITHUB_WORKSPACE/external/OpenCL-Headers/install/OpenCL
 
     - name: Build & install OpenCL-ICD-Loader
       run: cmake
