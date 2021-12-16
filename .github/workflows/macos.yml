@@ -22,7 +22,7 @@ jobs:
       uses: actions/checkout@v2
       with:
         repository: StreamHPC/OpenCL-Headers
-        ref: no-system
+        ref: develop_stream
         path: external/OpenCL-Headers
 
     - name: Checkout OpenCL-ICD-Loader
