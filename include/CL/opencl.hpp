@@ -519,11 +519,7 @@
 #error Visual studio 2013 or another C++11-supporting compiler required
 #endif
 
-#if defined(__APPLE__) || defined(__MACOSX)
-#include <OpenCL/opencl.h>
-#else
 #include <CL/opencl.h>
-#endif // !__APPLE__
 
 #if __cplusplus >= 201703L
 # define CL_HPP_DEFINE_STATIC_MEMBER_ inline
