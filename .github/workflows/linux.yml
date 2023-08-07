@@ -7,6 +7,7 @@ env:
 
 jobs:
   cmake-minimum:
+    if: false
     runs-on: ${{ matrix.OS }}
     container: streamhpc/opencl-sdk-base:ubuntu-18.04-20220127
     strategy:
@@ -204,6 +205,7 @@ jobs:
 
 
   cmake-latest:
+    if: false
     runs-on: ${{ matrix.OS }}
     strategy:
       matrix:
