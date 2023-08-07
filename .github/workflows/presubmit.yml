@@ -1,0 +1,265 @@
+name: Presubmit
+
+on: [push, pull_request]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        CMAKE: [3.26.4]
+        COMPILER:
+          - C_NAME: gcc
+            CXX_NAME: g++
+            VER: 11
+          - C_NAME: gcc
+            CXX_NAME: g++
+            VER: 13
+          - C_NAME: clang
+            CXX_NAME: clang++
+            VER: 14
+          - C_NAME: clang
+            CXX_NAME: clang++
+            VER: 16
+        BIN: [64]
+        STD: [11, 17]
+        CONF:
+          - GEN: Unix Makefiles
+            CONFIG: Debug
+          - GEN: Unix Makefiles
+            CONFIG: Release
+          - GEN: Ninja Multi-Config
+            CONFIG: Release
+        IMAGE:
+          - streamhpc/opencl-sdk-intelcpu:ubuntu-22.04-20230717
+        include:
+          - CMAKE: 3.1.3
+            COMPILER:
+              C_NAME: gcc
+              CXX_NAME: g++
+              VER: 7
+            BIN: 64
+            STD: 99
+            CONF:
+              GEN: Unix Makefiles
+              CONFIG: Debug
+            IMAGE: streamhpc/opencl-sdk-intelcpu:ubuntu-18.04-20220127
+          - CMAKE: 3.1.3
+            COMPILER:
+              C_NAME: gcc
+              CXX_NAME: g++
+              VER: 7
+            BIN: 64
+            STD: 99
+            CONF:
+              GEN: Unix Makefiles
+              CONFIG: Release
+            IMAGE: streamhpc/opencl-sdk-intelcpu:ubuntu-18.04-20220127
+          - CMAKE: 3.1.3
+            COMPILER:
+              C_NAME: clang
+              CXX_NAME: clang++
+              VER: 8
+            BIN: 64
+            STD: 99
+            CONF:
+              GEN: Unix Makefiles
+              CONFIG: Debug
+            IMAGE: streamhpc/opencl-sdk-intelcpu:ubuntu-18.04-20220127
+          - CMAKE: 3.1.3
+            COMPILER:
+              C_NAME: clang
+              CXX_NAME: clang++
+              VER: 8
+            BIN: 64
+            STD: 99
+            CONF:
+              GEN: Unix Makefiles
+              CONFIG: Release
+            IMAGE: streamhpc/opencl-sdk-intelcpu:ubuntu-18.04-20220127
+    container: ${{matrix.IMAGE}}
+    env:
+      CMAKE_EXE: /opt/Kitware/CMake/${{ matrix.CMAKE }}/bin/cmake
+      CPACK_EXE: /opt/Kitware/CMake/${{ matrix.CMAKE }}/bin/cpack
+      CTEST_EXE: /opt/Kitware/CMake/${{ matrix.CMAKE }}/bin/ctest
+      DEB_INSTALLATION_PATH: /usr
+      CC: ${{matrix.COMPILER.C_NAME}}-${{matrix.COMPILER.VER}}
+      CXX:  ${{matrix.COMPILER.CXX_NAME}}-${{matrix.COMPILER.VER}}
+
+    steps:
+    - name: Checkout OpenCL-CLHPP
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Checkout OpenCL-Headers
+      uses: actions/checkout@v3
+      with:
+        path: external/OpenCL-Headers
+        # ToDo: Change to KhronosGroup/OpenCL-Headers:main
+        repository: StreamHPC/OpenCL-Headers
+        ref: update-ci
+
+    - name: Checkout OpenCL-ICD-Loader
+      uses: actions/checkout@v3
+      with:
+        path: external/OpenCL-ICD-Loader
+        # ToDo: Change to KhronosGroup/OpenCL-ICD-Loader:main
+        repository: StreamHPC/OpenCL-ICD-Loader
+        ref: update-ci
+
+    - name: Configure, install & package OpenCL-Headers
+      run: mkdir $GITHUB_WORKSPACE/external/OpenCL-Headers/build &&
+        cd $GITHUB_WORKSPACE/external/OpenCL-Headers/build &&
+        $CMAKE_EXE
+        -G "${{matrix.CONF.GEN}}"
+        `if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]]; then echo "-D CMAKE_BUILD_TYPE=${{matrix.CONF.CONFIG}}"; fi`
+        -D CMAKE_C_FLAGS="-w -m${{matrix.BIN}}"
+        -D CMAKE_C_EXTENSIONS=OFF
+        -D CMAKE_INSTALL_PREFIX=`if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "$GITHUB_WORKSPACE/external/OpenCL-Headers/install"; else echo "$DEB_INSTALLATION_PATH"; fi`
+        `if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "-D CPACK_PACKAGING_INSTALL_PREFIX=$DEB_INSTALLATION_PATH"; fi`
+        -D BUILD_TESTING=OFF
+        $GITHUB_WORKSPACE/external/OpenCL-Headers &&
+        $CMAKE_EXE
+        --build $GITHUB_WORKSPACE/external/OpenCL-Headers/build
+        --target install
+        --
+        -j`nproc` &&
+        $CPACK_EXE
+        --config "$GITHUB_WORKSPACE/external/OpenCL-Headers/build/CPackConfig.cmake"
+        -G DEB
+        -C ${{matrix.CONF.CONFIG}}
+        -B "$GITHUB_WORKSPACE/external/OpenCL-Headers/package-deb"
+
+    - name: Configure & install OpenCL-ICD-Loader
+      run: mkdir $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build &&
+        cd $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build &&
+        $CMAKE_EXE
+        -G "${{matrix.CONF.GEN}}"
+        `if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]]; then echo "-D CMAKE_BUILD_TYPE=${{matrix.CONF.CONFIG}}"; fi`
+        -D CMAKE_C_FLAGS="-w -m${{matrix.BIN}}"
+        -D CMAKE_C_EXTENSIONS=OFF
+        -D CMAKE_INSTALL_PREFIX=`if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install"; else echo "$DEB_INSTALLATION_PATH"; fi`
+        `if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "-D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install"; fi`
+        -D BUILD_TESTING=OFF
+        $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader &&
+        $CMAKE_EXE
+        --build $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build
+        --target install
+        --
+        -j`nproc`
+
+    - name: Configure
+      shell: bash
+      # no -Werror during configuration because:
+      # warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
+      # warning: unused parameter [-Wunused-parameter]
+      run: mkdir $GITHUB_WORKSPACE/build && cd $GITHUB_WORKSPACE/build &&
+        $CMAKE_EXE
+        -G "${{matrix.CONF.GEN}}"
+        -D BUILD_TESTING=ON
+        -D BUILD_EXAMPLES=ON
+        `if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]]; then echo "-D CMAKE_BUILD_TYPE=${{matrix.CONF.CONFIG}}"; fi`
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
+        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_EXTENSIONS=OFF
+        -D CMAKE_INSTALL_PREFIX=`if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "$GITHUB_WORKSPACE/install"; else echo "$DEB_INSTALLATION_PATH"; fi`
+        `if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "-D CPACK_PACKAGING_INSTALL_PREFIX=$DEB_INSTALLATION_PATH"; fi`
+        `if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "-D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install"; fi`
+        $GITHUB_WORKSPACE
+
+    - name: Build
+      shell: bash
+      run: if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]];
+        then
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build --config ${{matrix.CONF.CONFIG}} -- -j `nproc`;
+        else
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build --config Debug;
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build --config Release;
+        fi
+
+    - name: Test
+      shell: bash
+      working-directory: ${{runner.workspace}}/OpenCL-CLHPP/build
+      run: if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]];
+        then
+          $CTEST_EXE --output-on-failure --parallel `nproc`;
+        else
+          $CTEST_EXE --output-on-failure -C Debug   --parallel `nproc`;
+          $CTEST_EXE --output-on-failure -C Release --parallel `nproc`;
+        fi
+
+    - name: Package DEB
+      shell: bash
+      run: $CPACK_EXE
+        --config "$GITHUB_WORKSPACE/build/CPackConfig.cmake"
+        -G DEB
+        -C ${{matrix.CONF.CONFIG}}
+        -B "$GITHUB_WORKSPACE/package-deb"
+
+    - name: Consume (DEB)
+      shell: bash
+      run: dpkg -i $GITHUB_WORKSPACE/external/OpenCL-Headers/package-deb/*.deb &&
+        dpkg -i $GITHUB_WORKSPACE/package-deb/*.deb &&
+        mkdir $GITHUB_WORKSPACE/build_package &&
+        cd $GITHUB_WORKSPACE/build_package &&
+        $CMAKE_EXE
+        -G "${{matrix.CONF.GEN}}"
+        `if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]]; then echo "-D CMAKE_BUILD_TYPE=${{matrix.CONF.CONFIG}}"; fi`
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
+        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_EXTENSIONS=OFF
+        `if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "-D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install"; fi`
+        $GITHUB_WORKSPACE/tests/pkgconfig/bare &&
+        if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]];
+        then
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build_package --config ${{matrix.CONF.CONFIG}} -- -j `nproc`;
+        else
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build_package --config Debug;
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build_package --config Release;
+        fi
+
+    - name: Test pkg-config (DEB)
+      shell: bash
+      # /usr/include is already on the include search path,
+      # we don't expect any output
+      run: if [[ $(pkg-config OpenCL-CLHPP --cflags) ]];
+        then
+          exit 1;
+        fi;
+
+    - name: Uninstall (DEB)
+      shell: bash
+      run: apt-get remove -y opencl-clhpp-headers
+
+    - name: Re-configure for install
+      if: matrix.CMAKE == '3.1.3'
+      shell: bash
+      run: cd $GITHUB_WORKSPACE/build &&
+        $CMAKE_EXE -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install $GITHUB_WORKSPACE
+
+    - name: Test install
+      shell: bash
+      run: $CMAKE_EXE --build $GITHUB_WORKSPACE/build --target install --config ${{matrix.CONF.CONFIG}} -- -j`nproc`;
+
+    - name: Consume (install)
+      shell: bash
+      run: mkdir $GITHUB_WORKSPACE/build_install && cd $GITHUB_WORKSPACE/build_install &&
+        $CMAKE_EXE
+        -G "${{matrix.CONF.GEN}}"
+        `if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]]; then echo "-D CMAKE_BUILD_TYPE=${{matrix.CONF.CONFIG}}"; fi`
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
+        -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install;$GITHUB_WORKSPACE/install"
+        $GITHUB_WORKSPACE/tests/pkgconfig/bare &&
+        if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]];
+        then
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build_install -- -j`nproc`;
+        else
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build_install --config Debug   -- -j`nproc`;
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build_install --config Release -- -j`nproc`;
+        fi
+
+    - name: Test pkg-config (install)
+      shell: bash
+      run: PKG_CONFIG_PATH=$GITHUB_WORKSPACE/install/share/pkgconfig
+        pkg-config OpenCL-CLHPP --cflags | grep -q "\-I$GITHUB_WORKSPACE/install/include"

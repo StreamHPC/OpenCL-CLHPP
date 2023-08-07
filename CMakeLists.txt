@@ -73,11 +73,11 @@ install(
   EXPORT OpenCLHeadersCppTargets
 )
 
+include(GNUInstallDirs)
+
 set (CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(JoinPaths)
 include(Package)
-
-include(GNUInstallDirs)
 
 install(
   DIRECTORY include/CL
@@ -131,11 +131,3 @@ endif(BUILD_EXAMPLES)
 if(CLHPP_BUILD_TESTS)
   add_subdirectory(tests)
 endif(CLHPP_BUILD_TESTS)
-
-join_paths(OPENCLHPP_INCLUDEDIR_PC "\${prefix}" "${CMAKE_INSTALL_INCLUDEDIR}")
-
-configure_file(OpenCL-CLHPP.pc.in OpenCL-CLHPP.pc @ONLY)
-set(pkg_config_location ${CMAKE_INSTALL_DATADIR}/pkgconfig)
-install(
-  FILES ${CMAKE_CURRENT_BINARY_DIR}/OpenCL-CLHPP.pc
-  DESTINATION ${pkg_config_location})
