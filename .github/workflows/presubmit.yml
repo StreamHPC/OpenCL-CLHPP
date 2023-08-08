@@ -4,7 +4,6 @@ on: [push, pull_request]
 
 jobs:
   linux:
-    if: false
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -266,7 +265,6 @@ jobs:
         pkg-config OpenCL-CLHPP --cflags | grep -q "\-I$GITHUB_WORKSPACE/install/include"
 
   windows:
-    if: false
     runs-on: windows-latest
     strategy:
       matrix:
@@ -651,3 +649,154 @@ jobs:
           & ctest `
             --output-on-failure -C ${Config}
         }
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        COMPILER:
+          - C_NAME: /usr/bin/gcc
+            CXX_NAME: /usr/bin/g++
+          - C_NAME: /usr/local/bin/gcc-11
+            CXX_NAME: /usr/local/bin/g++-11
+          - C_NAME: /usr/local/bin/gcc-13
+            CXX_NAME: /usr/local/bin/g++-13
+        GEN:
+        - Xcode
+        - Ninja Multi-Config
+        STD: [11, 17]
+        exclude:
+        - COMPILER:
+            C_NAME: /usr/bin/gcc
+            CXX_NAME: /usr/bin/g++
+          GEN: Ninja Multi-Config
+        - COMPILER:
+            C_NAME: /usr/local/bin/gcc-11
+            CXX_NAME: /usr/local/bin/g++-11
+          GEN: Xcode
+        - COMPILER:
+            C_NAME: /usr/local/bin/gcc-13
+            CXX_NAME: /usr/local/bin/g++-13
+          GEN: Xcode
+    env:
+      CC: ${{matrix.COMPILER.C_NAME}}
+      CCX: ${{matrix.COMPILER.CXX_NAME}}
+
+    steps:
+    - name: Checkout OpenCL-CLHPP
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Checkout OpenCL-Headers
+      uses: actions/checkout@v3
+      with:
+        repository: KhronosGroup/OpenCL-Headers
+        path: external/OpenCL-Headers
+
+    - name: Checkout OpenCL-ICD-Loader
+      uses: actions/checkout@v3
+      with:
+        repository: KhronosGroup/OpenCL-ICD-Loader
+        path: external/OpenCL-ICD-Loader
+
+    - name: Create Build Environment
+      run: |
+        cmake -E make_directory $GITHUB_WORKSPACE/build &&
+        cmake -E make_directory $GITHUB_WORKSPACE/install &&
+        if [[ "${{matrix.GEN}}" == "Ninja Multi-Config" && ! `which ninja` ]]; then brew install ninja; fi &&
+        # Install Ninja only if it's the selected generator and it's not available.
+        cmake --version
+
+    - name: Build & install OpenCL-Headers
+      run: cmake
+        -G "${{matrix.GEN}}"
+        -D BUILD_TESTING=OFF
+        -D CMAKE_C_FLAGS="-w"
+        -D CMAKE_C_EXTENSIONS=OFF
+        -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
+        -S $GITHUB_WORKSPACE/external/OpenCL-Headers
+        -B $GITHUB_WORKSPACE/external/OpenCL-Headers/build &&
+        cmake
+        --build $GITHUB_WORKSPACE/external/OpenCL-Headers/build
+        --target install
+        --config Release
+        --parallel `sysctl -n hw.logicalcpu`
+
+    - name: Build & install OpenCL-ICD-Loader
+      run: cmake
+        -G "${{matrix.GEN}}"
+        -D BUILD_TESTING=OFF
+        -D CMAKE_C_FLAGS="-w -m64"
+        -D CMAKE_C_EXTENSIONS=OFF
+        -D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
+        -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install
+        -S $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader
+        -B $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build &&
+        cmake
+        --build $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build
+        --target install
+        --config Release
+        --parallel `sysctl -n hw.logicalcpu`
+
+    - name: Configure
+      # no -Werror during configuration because:
+      # warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
+      # warning: unused parameter [-Wunused-parameter]
+      shell: bash
+      run: cmake
+        -G "${{matrix.GEN}}"
+        -D BUILD_TESTING=ON
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Wno-format -m64"
+        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_EXTENSIONS=OFF
+        -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
+        -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install"
+        -S $GITHUB_WORKSPACE
+        -B $GITHUB_WORKSPACE/build
+
+    - name: Build
+      shell: bash
+      run: |
+        cmake --build $GITHUB_WORKSPACE/build --config Release --parallel `sysctl -n hw.logicalcpu`
+        cmake --build $GITHUB_WORKSPACE/build --config Debug --parallel `sysctl -n hw.logicalcpu`
+
+    - name: Test
+      working-directory: ${{runner.workspace}}/OpenCL-CLHPP/build
+      shell: bash
+      run: |
+        ctest -C Release --output-on-failure --parallel `sysctl -n hw.logicalcpu`
+        ctest -C Debug --output-on-failure --parallel `sysctl -n hw.logicalcpu`
+
+    - name: Test install
+      shell: bash
+      run: |
+        cmake --build $GITHUB_WORKSPACE/build --config Release --target install
+
+    - name: Consume (install)
+      shell: bash
+      run: cmake
+        -G "${{matrix.GEN}}"
+        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Wno-format -m64"
+        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_EXTENSIONS=OFF
+        -D CMAKE_CXX_STANDARD_REQUIRED=ON
+        -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install;$GITHUB_WORKSPACE/install"
+        -S $GITHUB_WORKSPACE/tests/pkgconfig/bare
+        -B $GITHUB_WORKSPACE/build_install &&
+        cmake --build $GITHUB_WORKSPACE/build_install --config Release --parallel `sysctl -n hw.logicalcpu` `if [[ "${{matrix.GEN}}" == "Xcode" ]]; then echo "-- -quiet"; fi;` &&
+        cmake --build $GITHUB_WORKSPACE/build_install --config Debug --parallel `sysctl -n hw.logicalcpu` `if [[ "${{matrix.GEN}}" == "Xcode" ]]; then echo "-- -quiet"; fi;`
+
+    - name: Test pkg-config
+      shell: bash
+      run: |
+        if [[ ! `which pkg-config` ]]; then brew install pkg-config; fi;
+        export PKG_CONFIG_PATH=$GITHUB_WORKSPACE/install/share/pkgconfig:$GITHUB_WORKSPACE/external/OpenCL-Headers/install/share/pkgconfig:$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install/lib/pkgconfig
+        pkg-config OpenCL-CLHPP --cflags | grep -q "\-I$GITHUB_WORKSPACE/install/include"
+
+    - name: Test pkg-config dependency
+      shell: bash
+      run: |
+        if [[ ! `which pkg-config` ]]; then brew install pkg-config; fi;
+        export PKG_CONFIG_PATH=$GITHUB_WORKSPACE/install/share/pkgconfig:$GITHUB_WORKSPACE/external/OpenCL-Headers/install/share/pkgconfig:$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install/lib/pkgconfig
+        pkg-config OpenCL-CLHPP --cflags | grep -q "\-I$GITHUB_WORKSPACE/external/OpenCL-Headers/install/include"
