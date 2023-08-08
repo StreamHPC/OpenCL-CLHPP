@@ -178,6 +178,7 @@ jobs:
       # no /WX during configuration because:
       # warning C4459: declaration of 'platform' hides global declaration
       # warning C4100: 'input_headers': unreferenced formal parameter
+      # Not configuring tests when using clangcl because of compilation errors
       run: |
         $BIN = if('${{matrix.BIN}}' -eq 'x86') {'Win32'} else {'x64'}
         $C_FLAGS='/W4'
@@ -185,7 +186,7 @@ jobs:
           -G '${{matrix.GEN}}' `
           -A $BIN `
           -T ${{matrix.VER}} `
-          -D BUILD_TESTING=ON `
+          -D BUILD_TESTING="if [[ "${{matrix.VER}}" == "clangcl" ]]; then echo "OFF"; else echo "ON"; fi" `
           -D CMAKE_C_FLAGS=$C_FLAGS `
           -D CMAKE_C_STANDARD=${{matrix.STD}} `
           -D CMAKE_C_EXTENSIONS=OFF `
