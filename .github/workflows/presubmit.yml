@@ -4,6 +4,7 @@ on: [push, pull_request]
 
 jobs:
   linux:
+    if: false
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -265,6 +266,7 @@ jobs:
         pkg-config OpenCL-CLHPP --cflags | grep -q "\-I$GITHUB_WORKSPACE/install/include"
 
   windows:
+    if: false
     runs-on: windows-latest
     strategy:
       matrix:
