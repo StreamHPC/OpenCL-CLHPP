@@ -9,3 +9,6 @@
 
 # External dir
 [Ee]xternal/
+
+# Visual Studio Code
+.vscode
