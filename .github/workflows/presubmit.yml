@@ -52,7 +52,7 @@ jobs:
             CXX_NAME: clang++
             VER: 16
         BIN: [64]
-        STD: [11, 17]
+        CXXSTD: [11, 17]
         CONF:
           - GEN: Unix Makefiles
             CONFIG: Debug
@@ -61,52 +61,52 @@ jobs:
           - GEN: Ninja Multi-Config
             CONFIG: Release
         IMAGE:
-          - streamhpc/opencl-sdk-intelcpu:ubuntu-22.04-20230717
+          - streamhpc/opencl-sdk-base:ubuntu-22.04-20230717
         include:
-          - CMAKE: 3.1.3
+          - CMAKE: system
             COMPILER:
               C_NAME: gcc
               CXX_NAME: g++
-              VER: 7
+              VER: 9
             BIN: 64
-            STD: 99
+            CXXSTD: 11
             CONF:
               GEN: Unix Makefiles
               CONFIG: Debug
-            IMAGE: streamhpc/opencl-sdk-intelcpu:ubuntu-18.04-20220127
-          - CMAKE: 3.1.3
+            IMAGE: streamhpc/opencl-sdk-base:ubuntu-20.04-20230717
+          - CMAKE: system
             COMPILER:
               C_NAME: gcc
               CXX_NAME: g++
-              VER: 7
+              VER: 9
             BIN: 64
-            STD: 99
+            CXXSTD: 11
             CONF:
               GEN: Unix Makefiles
               CONFIG: Release
-            IMAGE: streamhpc/opencl-sdk-intelcpu:ubuntu-18.04-20220127
-          - CMAKE: 3.1.3
+            IMAGE: streamhpc/opencl-sdk-base:ubuntu-20.04-20230717
+          - CMAKE: system
             COMPILER:
-              C_NAME: clang
-              CXX_NAME: clang++
-              VER: 8
-            BIN: 64
-            STD: 99
+              C_NAME: gcc
+              CXX_NAME: g++
+              VER: 9
+            BIN: 32
+            CXXSTD: 11
             CONF:
               GEN: Unix Makefiles
               CONFIG: Debug
-            IMAGE: streamhpc/opencl-sdk-intelcpu:ubuntu-18.04-20220127
-          - CMAKE: 3.1.3
+            IMAGE: streamhpc/opencl-sdk-base:ubuntu-20.04-20230717
+          - CMAKE: system
             COMPILER:
-              C_NAME: clang
-              CXX_NAME: clang++
-              VER: 8
-            BIN: 64
-            STD: 99
+              C_NAME: gcc
+              CXX_NAME: g++
+              VER: 9
+            BIN: 32
+            CXXSTD: 11
             CONF:
               GEN: Unix Makefiles
               CONFIG: Release
-            IMAGE: streamhpc/opencl-sdk-intelcpu:ubuntu-18.04-20220127
+            IMAGE: streamhpc/opencl-sdk-base:ubuntu-20.04-20230717
     container: ${{matrix.IMAGE}}
     env:
       CMAKE_EXE: /opt/Kitware/CMake/${{ matrix.CMAKE }}/bin/cmake
@@ -115,8 +115,18 @@ jobs:
       DEB_INSTALLATION_PATH: /usr
       CC: ${{matrix.COMPILER.C_NAME}}-${{matrix.COMPILER.VER}}
       CXX:  ${{matrix.COMPILER.CXX_NAME}}-${{matrix.COMPILER.VER}}
+      CFLAGS: -Wall -Wextra -pedantic -Werror -m${{matrix.BIN}}
+      CXXFLAGS: -Wall -Wextra -pedantic -Werror -m${{matrix.BIN}}
 
     steps:
+    - name: Install system CMake
+      shell: bash
+      if: ${{matrix.CMAKE}} == 'system'
+      run: apt-get update -qq && apt-get install -y cmake &&
+        echo "CMAKE_EXE=cmake" >> "$GITHUB_ENV" &&
+        echo "CPACK_EXE=cpack" >> "$GITHUB_ENV" &&
+        echo "CTEST_EXE=ctest" >> "$GITHUB_ENV"
+
     - name: Checkout OpenCL-CLHPP
       uses: actions/checkout@v3
       with:
@@ -139,22 +149,19 @@ jobs:
         ref: update-ci
 
     - name: Configure, install & package OpenCL-Headers
-      run: mkdir $GITHUB_WORKSPACE/external/OpenCL-Headers/build &&
-        cd $GITHUB_WORKSPACE/external/OpenCL-Headers/build &&
-        $CMAKE_EXE
+      run: $CMAKE_EXE
         -G "${{matrix.CONF.GEN}}"
         `if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]]; then echo "-D CMAKE_BUILD_TYPE=${{matrix.CONF.CONFIG}}"; fi`
-        -D CMAKE_C_FLAGS="-w -m${{matrix.BIN}}"
         -D CMAKE_C_EXTENSIONS=OFF
-        -D CMAKE_INSTALL_PREFIX=`if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "$GITHUB_WORKSPACE/external/OpenCL-Headers/install"; else echo "$DEB_INSTALLATION_PATH"; fi`
-        `if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "-D CPACK_PACKAGING_INSTALL_PREFIX=$DEB_INSTALLATION_PATH"; fi`
+        -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
+        -D CPACK_PACKAGING_INSTALL_PREFIX=$DEB_INSTALLATION_PATH
         -D BUILD_TESTING=OFF
-        $GITHUB_WORKSPACE/external/OpenCL-Headers &&
+        -S $GITHUB_WORKSPACE/external/OpenCL-Headers
+        -B $GITHUB_WORKSPACE/external/OpenCL-Headers/build &&
         $CMAKE_EXE
         --build $GITHUB_WORKSPACE/external/OpenCL-Headers/build
         --target install
-        --
-        -j`nproc` &&
+        --parallel `nproc` &&
         $CPACK_EXE
         --config "$GITHUB_WORKSPACE/external/OpenCL-Headers/build/CPackConfig.cmake"
         -G DEB
@@ -162,47 +169,40 @@ jobs:
         -B "$GITHUB_WORKSPACE/external/OpenCL-Headers/package-deb"
 
     - name: Configure & install OpenCL-ICD-Loader
-      run: mkdir $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build &&
-        cd $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build &&
-        $CMAKE_EXE
+      run: $CMAKE_EXE
         -G "${{matrix.CONF.GEN}}"
         `if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]]; then echo "-D CMAKE_BUILD_TYPE=${{matrix.CONF.CONFIG}}"; fi`
-        -D CMAKE_C_FLAGS="-w -m${{matrix.BIN}}"
         -D CMAKE_C_EXTENSIONS=OFF
-        -D CMAKE_INSTALL_PREFIX=`if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install"; else echo "$DEB_INSTALLATION_PATH"; fi`
-        `if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "-D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install"; fi`
+        -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install
+        -D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
         -D BUILD_TESTING=OFF
-        $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader &&
+        -S $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader
+        -B $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build &&
         $CMAKE_EXE
         --build $GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/build
         --target install
-        --
-        -j`nproc`
+        --parallel `nproc`
 
     - name: Configure
       shell: bash
-      # no -Werror during configuration because:
-      # warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
-      # warning: unused parameter [-Wunused-parameter]
-      run: mkdir $GITHUB_WORKSPACE/build && cd $GITHUB_WORKSPACE/build &&
-        $CMAKE_EXE
+      run: $CMAKE_EXE
         -G "${{matrix.CONF.GEN}}"
         -D BUILD_TESTING=ON
         -D BUILD_EXAMPLES=ON
         `if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]]; then echo "-D CMAKE_BUILD_TYPE=${{matrix.CONF.CONFIG}}"; fi`
-        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
-        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_STANDARD=${{matrix.CXXSTD}}
         -D CMAKE_CXX_EXTENSIONS=OFF
-        -D CMAKE_INSTALL_PREFIX=`if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "$GITHUB_WORKSPACE/install"; else echo "$DEB_INSTALLATION_PATH"; fi`
-        `if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "-D CPACK_PACKAGING_INSTALL_PREFIX=$DEB_INSTALLATION_PATH"; fi`
-        `if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "-D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install"; fi`
-        $GITHUB_WORKSPACE
+        -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
+        -D CPACK_PACKAGING_INSTALL_PREFIX=$DEB_INSTALLATION_PATH
+        -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install"
+        -S $GITHUB_WORKSPACE
+        -B $GITHUB_WORKSPACE/build
 
     - name: Build
       shell: bash
       run: if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]];
         then
-          $CMAKE_EXE --build $GITHUB_WORKSPACE/build --config ${{matrix.CONF.CONFIG}} -- -j `nproc`;
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build --config ${{matrix.CONF.CONFIG}} --parallel `nproc`;
         else
           $CMAKE_EXE --build $GITHUB_WORKSPACE/build --config Debug;
           $CMAKE_EXE --build $GITHUB_WORKSPACE/build --config Release;
@@ -231,19 +231,17 @@ jobs:
       shell: bash
       run: dpkg -i $GITHUB_WORKSPACE/external/OpenCL-Headers/package-deb/*.deb &&
         dpkg -i $GITHUB_WORKSPACE/package-deb/*.deb &&
-        mkdir $GITHUB_WORKSPACE/build_package &&
-        cd $GITHUB_WORKSPACE/build_package &&
         $CMAKE_EXE
         -G "${{matrix.CONF.GEN}}"
         `if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]]; then echo "-D CMAKE_BUILD_TYPE=${{matrix.CONF.CONFIG}}"; fi`
-        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
-        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_STANDARD=${{matrix.CXXSTD}}
         -D CMAKE_CXX_EXTENSIONS=OFF
-        `if [[ "${{matrix.CMAKE}}" != "3.1.3" ]]; then echo "-D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install"; fi`
-        $GITHUB_WORKSPACE/tests/pkgconfig/bare &&
+        -D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install
+        -S $GITHUB_WORKSPACE/tests/pkgconfig/bare
+        -B $GITHUB_WORKSPACE/build_package &&
         if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]];
         then
-          $CMAKE_EXE --build $GITHUB_WORKSPACE/build_package --config ${{matrix.CONF.CONFIG}} -- -j `nproc`;
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build_package --config ${{matrix.CONF.CONFIG}} --parallel `nproc`;
         else
           $CMAKE_EXE --build $GITHUB_WORKSPACE/build_package --config Debug;
           $CMAKE_EXE --build $GITHUB_WORKSPACE/build_package --config Release;
@@ -253,7 +251,9 @@ jobs:
       shell: bash
       # /usr/include is already on the include search path,
       # we don't expect any output
-      run: if [[ $(pkg-config OpenCL-CLHPP --cflags) ]];
+      run: |
+        pkg-config OpenCL-CLHPP --cflags
+        if [[ "$(pkg-config OpenCL-CLHPP --cflags)" ]];
         then
           exit 1;
         fi;
@@ -262,28 +262,21 @@ jobs:
       shell: bash
       run: apt-get remove -y opencl-clhpp-headers
 
-    - name: Re-configure for install
-      if: matrix.CMAKE == '3.1.3'
-      shell: bash
-      run: cd $GITHUB_WORKSPACE/build &&
-        $CMAKE_EXE -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install $GITHUB_WORKSPACE
-
     - name: Test install
       shell: bash
       run: $CMAKE_EXE --build $GITHUB_WORKSPACE/build --target install --config ${{matrix.CONF.CONFIG}} -- -j`nproc`;
 
     - name: Consume (install)
       shell: bash
-      run: mkdir $GITHUB_WORKSPACE/build_install && cd $GITHUB_WORKSPACE/build_install &&
-        $CMAKE_EXE
+      run: $CMAKE_EXE
         -G "${{matrix.CONF.GEN}}"
         `if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]]; then echo "-D CMAKE_BUILD_TYPE=${{matrix.CONF.CONFIG}}"; fi`
-        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -m${{matrix.BIN}}"
         -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install;$GITHUB_WORKSPACE/install"
-        $GITHUB_WORKSPACE/tests/pkgconfig/bare &&
+        -S $GITHUB_WORKSPACE/tests/pkgconfig/bare
+        -B $GITHUB_WORKSPACE/build_install &&
         if [[ "${{matrix.CONF.GEN}}" == "Unix Makefiles" ]];
         then
-          $CMAKE_EXE --build $GITHUB_WORKSPACE/build_install -- -j`nproc`;
+          $CMAKE_EXE --build $GITHUB_WORKSPACE/build_install --parallel `nproc`;
         else
           $CMAKE_EXE --build $GITHUB_WORKSPACE/build_install --config Debug   -- -j`nproc`;
           $CMAKE_EXE --build $GITHUB_WORKSPACE/build_install --config Release -- -j`nproc`;
@@ -302,7 +295,7 @@ jobs:
         VER: [v141, v142, v143, clangcl]
         GEN: [Visual Studio 17 2022, Ninja Multi-Config]
         BIN: [x64]
-        STD: [11, 17]
+        CXXSTD: [11, 17]
         exclude:
         - VER: clangcl
           GEN: Ninja Multi-Config
@@ -310,7 +303,7 @@ jobs:
           - VER: v142
             GEN: Visual Studio 17 2022
             BIN: x86
-            STD: 99
+            CXXSTD: 11
     env:
       NINJA_URL: https://github.com/ninja-build/ninja/releases/download/v1.10.2/ninja-win.zip
       NINJA_ROOT: C:\Tools\Ninja
@@ -318,6 +311,9 @@ jobs:
       UseMultiToolTask: true # Better parallel MSBuild execution
       EnforceProcessCountAcrossBuilds: 'true' # -=-
       MultiProcMaxCount: '3'                  # -=-
+      WindowsSDKVersion: '10.0.22621.0'
+      CFLAGS: /W4 /WX
+      CXXFLAGS: /W4 /WX
 
     steps:
     - name: Cache Ninja install
@@ -359,16 +355,13 @@ jobs:
       shell: pwsh
       run: |
         $BIN = if('${{matrix.BIN}}' -eq 'x86') {'Win32'} else {'x64'}
-        $C_FLAGS='/w'
         & cmake `
           -G '${{matrix.GEN}}' `
           -A $BIN `
           -T ${{matrix.VER}} `
           -D BUILD_TESTING=OFF `
-          -D CMAKE_C_FLAGS=$C_FLAGS `
-          -D CMAKE_C_STANDARD=${{matrix.STD}} `
-          -D CMAKE_C_EXTENSIONS=OFF `
           -D CMAKE_INSTALL_PREFIX=${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install `
+          -D CMAKE_SYSTEM_VERSION="${env:WindowsSDKVersion}" `
           -S ${env:GITHUB_WORKSPACE}\external\OpenCL-Headers `
           -B ${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\build
         & cmake `
@@ -390,14 +383,10 @@ jobs:
           'v143' {'14.3'} }
         Import-Module "${env:VS_ROOT}\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
         Enter-VsDevShell -VsInstallPath ${env:VS_ROOT} -SkipAutomaticLocation -DevCmdArguments "-host_arch=x64 -arch=${{matrix.BIN}} -vcvars_ver=$VER"
-        $C_FLAGS='/w'
         & cmake `
           -G '${{matrix.GEN}}' `
           -D CMAKE_MAKE_PROGRAM="${env:NINJA_ROOT}\ninja.exe"  `
           -D BUILD_TESTING=OFF `
-          -D CMAKE_C_FLAGS=$C_FLAGS `
-          -D CMAKE_C_STANDARD=${{matrix.STD}} `
-          -D CMAKE_C_EXTENSIONS=OFF `
           -D CMAKE_INSTALL_PREFIX=${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install `
           -S ${env:GITHUB_WORKSPACE}\external\OpenCL-Headers `
           -B ${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\build
@@ -413,17 +402,14 @@ jobs:
       shell: pwsh
       run: |
         $BIN = if('${{matrix.BIN}}' -eq 'x86') {'Win32'} else {'x64'}
-        $C_FLAGS='/w'
         & cmake `
           -G '${{matrix.GEN}}' `
           -A $BIN `
           -T ${{matrix.VER}} `
           -D BUILD_TESTING=OFF `
-          -D CMAKE_C_FLAGS=$C_FLAGS `
-          -D CMAKE_C_STANDARD=${{matrix.STD}} `
-          -D CMAKE_C_EXTENSIONS=OFF `
           -D CMAKE_INSTALL_PREFIX=${env:GITHUB_WORKSPACE}\external\OpenCL-ICD-Loader\install `
           -D CMAKE_PREFIX_PATH=${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install `
+          -D CMAKE_SYSTEM_VERSION="${env:WindowsSDKVersion}" `
           -S ${env:GITHUB_WORKSPACE}\external\OpenCL-ICD-Loader `
           -B ${env:GITHUB_WORKSPACE}\external\OpenCL-ICD-Loader\build
         & cmake `
@@ -445,14 +431,10 @@ jobs:
           'v143' {'14.3'} }
         Import-Module "${env:VS_ROOT}\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
         Enter-VsDevShell -VsInstallPath ${env:VS_ROOT} -SkipAutomaticLocation -DevCmdArguments "-host_arch=x64 -arch=${{matrix.BIN}} -vcvars_ver=$VER"
-        $C_FLAGS='/w'
         & cmake `
           -G '${{matrix.GEN}}' `
           -D CMAKE_MAKE_PROGRAM="${env:NINJA_ROOT}\ninja.exe"  `
           -D BUILD_TESTING=OFF `
-          -D CMAKE_C_FLAGS=$C_FLAGS `
-          -D CMAKE_C_STANDARD=${{matrix.STD}} `
-          -D CMAKE_C_EXTENSIONS=OFF `
           -D CMAKE_INSTALL_PREFIX=${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install `
           -D CMAKE_PREFIX_PATH=${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install `
           -S ${env:GITHUB_WORKSPACE}\external\OpenCL-ICD-Loader `
@@ -467,33 +449,25 @@ jobs:
     - name: Configure (MSBuild)
       if: matrix.GEN == 'Visual Studio 17 2022'
       shell: pwsh
-      # no /WX during configuration because:
-      # warning C4459: declaration of 'platform' hides global declaration
-      # warning C4100: 'input_headers': unreferenced formal parameter
-      # not building the tests when using clangcl due to compilation errors
       run: |
         $BIN = if('${{matrix.BIN}}' -eq 'x86') {'Win32'} else {'x64'}
-        $C_FLAGS='/W4'
         $BUILD_TESTS = if('clangcl' -eq 'clangcl') {'OFF'} else {'ON'}
         & cmake `
           -G '${{matrix.GEN}}' `
           -A $BIN `
           -T ${{matrix.VER}} `
           -D BUILD_TESTING=$BUILD_TESTS `
-          -D CMAKE_C_FLAGS=$C_FLAGS `
-          -D CMAKE_C_STANDARD=${{matrix.STD}} `
-          -D CMAKE_C_EXTENSIONS=OFF `
+          -D CMAKE_CXX_STANDARD=${{matrix.CXXSTD}} `
+          -D CMAKE_CXX_EXTENSIONS=OFF `
           -D CMAKE_INSTALL_PREFIX=${env:GITHUB_WORKSPACE}\install `
           -D CMAKE_PREFIX_PATH="${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install;${env:GITHUB_WORKSPACE}\external\OpenCL-ICD-Loader\install" `
+          -D CMAKE_SYSTEM_VERSION="${env:WindowsSDKVersion}" `
           -S ${env:GITHUB_WORKSPACE} `
           -B ${env:GITHUB_WORKSPACE}\build
 
     - name: Configure (Ninja Multi-Config)
       if: matrix.GEN == 'Ninja Multi-Config'
       shell: pwsh
-      # no /WX during configuration because:
-      # warning C4459: declaration of 'platform' hides global declaration
-      # warning C4100: 'input_headers': unreferenced formal parameter
       run: |
         $VER = switch ('${{matrix.VER}}') { `
           'v141' {'14.1'} `
@@ -501,14 +475,12 @@ jobs:
           'v143' {'14.3'} }
         Import-Module "${env:VS_ROOT}\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
         Enter-VsDevShell -VsInstallPath ${env:VS_ROOT} -SkipAutomaticLocation -DevCmdArguments "-host_arch=x64 -arch=${{matrix.BIN}} -vcvars_ver=$VER"
-        $C_FLAGS='/W4'
         & cmake `
           -G '${{matrix.GEN}}' `
           -D CMAKE_MAKE_PROGRAM="${env:NINJA_ROOT}\ninja.exe" `
           -D BUILD_TESTING=ON `
-          -D CMAKE_C_FLAGS=$C_FLAGS `
-          -D CMAKE_C_STANDARD=${{matrix.STD}} `
-          -D CMAKE_C_EXTENSIONS=OFF `
+          -D CMAKE_CXX_STANDARD=${{matrix.CXXSTD}} `
+          -D CMAKE_CXX_EXTENSIONS=OFF `
           -D CMAKE_EXE_LINKER_FLAGS=/INCREMENTAL `
           -D CMAKE_INSTALL_PREFIX=${env:GITHUB_WORKSPACE}\install `
           -D CMAKE_PREFIX_PATH="${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install;${env:GITHUB_WORKSPACE}\external\OpenCL-ICD-Loader\install" `
@@ -570,17 +542,16 @@ jobs:
       shell: pwsh
       run: |
         $BIN = if('${{matrix.BIN}}' -eq 'x86') {'Win32'} else {'x64'}
-        $C_FLAGS = '/W4'
         & cmake `
           -G '${{matrix.GEN}}' `
           -A ${BIN} `
           -T ${{matrix.VER}} `
-          -D CMAKE_C_FLAGS="$C_FLAGS" `
-          -D CMAKE_C_STANDARD=${{matrix.STD}} `
-          -D CMAKE_C_EXTENSIONS=OFF `
+          -D CMAKE_CXX_STANDARD=${{matrix.CXXSTD}} `
+          -D CMAKE_CXX_EXTENSIONS=OFF `
           -D CMAKE_EXE_LINKER_FLAGS=/INCREMENTAL `
           -D CMAKE_PREFIX_PATH="${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install;${env:GITHUB_WORKSPACE}\install" `
           -D DRIVER_STUB_PATH="${env:GITHUB_WORKSPACE}\build\Release\OpenCLDriverStub.dll" `
+          -D CMAKE_SYSTEM_VERSION="${env:WindowsSDKVersion}" `
           -S "${env:GITHUB_WORKSPACE}\tests\pkgconfig\bare" `
           -B "${env:GITHUB_WORKSPACE}\downstream\pkgconfig\bare"
         foreach ($Config in 'Release','Debug') { `
@@ -601,13 +572,11 @@ jobs:
           'v143' {'14.3'} }
         Import-Module "${env:VS_ROOT}\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
         Enter-VsDevShell -VsInstallPath ${env:VS_ROOT} -SkipAutomaticLocation -DevCmdArguments "-host_arch=x64 -arch=${{matrix.BIN}} -vcvars_ver=$VER"
-        $C_FLAGS = '/W4'
         & cmake `
           -G '${{matrix.GEN}}' `
           -D CMAKE_MAKE_PROGRAM="${env:NINJA_ROOT}\ninja.exe" `
-          -D CMAKE_C_FLAGS="$C_FLAGS" `
-          -D CMAKE_C_STANDARD=${{matrix.STD}} `
-          -D CMAKE_C_EXTENSIONS=OFF `
+          -D CMAKE_CXX_STANDARD=${{matrix.CXXSTD}} `
+          -D CMAKE_CXX_EXTENSIONS=OFF `
           -D CMAKE_EXE_LINKER_FLAGS=/INCREMENTAL `
           -D CMAKE_PREFIX_PATH="${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install;${env:GITHUB_WORKSPACE}\install" `
           -D DRIVER_STUB_PATH="${env:GITHUB_WORKSPACE}\build\Release\OpenCLDriverStub.dll" `
@@ -631,15 +600,14 @@ jobs:
     - name: "Consume (MSBuild SDK): Configure/Build/Test"
       shell: pwsh
       run: |
-        $C_FLAGS = '/W4'
         & cmake `
           -G '${{matrix.GEN}}' `
-          -D CMAKE_C_FLAGS="$C_FLAGS" `
-          -D CMAKE_C_STANDARD=${{matrix.STD}} `
-          -D CMAKE_C_EXTENSIONS=OFF `
+          -D CMAKE_CXX_STANDARD=${{matrix.CXXSTD}} `
+          -D CMAKE_CXX_EXTENSIONS=OFF `
           -D CMAKE_EXE_LINKER_FLAGS=/INCREMENTAL `
           -D CMAKE_PREFIX_PATH="${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install;${env:GITHUB_WORKSPACE}\install" `
           -D DRIVER_STUB_PATH="${env:GITHUB_WORKSPACE}\build\Release\OpenCLDriverStub.dll" `
+          -D CMAKE_SYSTEM_VERSION="${env:WindowsSDKVersion}" `
           -S "${env:GITHUB_WORKSPACE}\tests\pkgconfig\sdk" `
           -B "${env:GITHUB_WORKSPACE}\downstream\pkgconfig\sdk"
         foreach ($Config in 'Release','Debug') { `
@@ -660,13 +628,11 @@ jobs:
           'v143' {'14.3'} }
         Import-Module "${env:VS_ROOT}\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
         Enter-VsDevShell -VsInstallPath ${env:VS_ROOT} -SkipAutomaticLocation -DevCmdArguments "-host_arch=x64 -arch=${{matrix.BIN}} -vcvars_ver=${VER}"
-        set C_FLAGS="/W4"
         & cmake `
           -G '${{matrix.GEN}}' `
           -D CMAKE_MAKE_PROGRAM="${env:NINJA_ROOT}\ninja.exe" `
-          -D CMAKE_C_FLAGS="$C_FLAGS" `
-          -D CMAKE_C_STANDARD=${{matrix.STD}} `
-          -D CMAKE_C_EXTENSIONS=OFF `
+          -D CMAKE_CXX_STANDARD=${{matrix.CXXSTD}} `
+          -D CMAKE_CXX_EXTENSIONS=OFF `
           -D CMAKE_EXE_LINKER_FLAGS=/INCREMENTAL `
           -D CMAKE_PREFIX_PATH="${env:GITHUB_WORKSPACE}\external\OpenCL-Headers\install;${env:GITHUB_WORKSPACE}\install" `
           -D DRIVER_STUB_PATH="${env:GITHUB_WORKSPACE}\build\Release\OpenCLDriverStub.dll" `
@@ -696,7 +662,7 @@ jobs:
         GEN:
         - Xcode
         - Ninja Multi-Config
-        STD: [11, 17]
+        CXXSTD: [11, 17]
         exclude:
         - COMPILER:
             C_NAME: /usr/bin/gcc
@@ -713,6 +679,8 @@ jobs:
     env:
       CC: ${{matrix.COMPILER.C_NAME}}
       CCX: ${{matrix.COMPILER.CXX_NAME}}
+      CFLAGS: -Wall -Wextra -pedantic -Wno-format -Werror
+      CXXFLAGS: -Wall -Wextra -pedantic -Wno-format -Werror
 
     steps:
     - name: Checkout OpenCL-CLHPP
@@ -744,7 +712,6 @@ jobs:
       run: cmake
         -G "${{matrix.GEN}}"
         -D BUILD_TESTING=OFF
-        -D CMAKE_C_FLAGS="-w"
         -D CMAKE_C_EXTENSIONS=OFF
         -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
         -S $GITHUB_WORKSPACE/external/OpenCL-Headers
@@ -759,7 +726,6 @@ jobs:
       run: cmake
         -G "${{matrix.GEN}}"
         -D BUILD_TESTING=OFF
-        -D CMAKE_C_FLAGS="-w -m64"
         -D CMAKE_C_EXTENSIONS=OFF
         -D CMAKE_PREFIX_PATH=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
         -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install
@@ -772,15 +738,11 @@ jobs:
         --parallel `sysctl -n hw.logicalcpu`
 
     - name: Configure
-      # no -Werror during configuration because:
-      # warning: ISO C forbids assignment between function pointer and ‘void *’ [-Wpedantic]
-      # warning: unused parameter [-Wunused-parameter]
       shell: bash
       run: cmake
         -G "${{matrix.GEN}}"
         -D BUILD_TESTING=ON
-        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Wno-format -m64"
-        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_STANDARD=${{matrix.CXXSTD}}
         -D CMAKE_CXX_EXTENSIONS=OFF
         -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install
         -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install"
@@ -809,8 +771,7 @@ jobs:
       shell: bash
       run: cmake
         -G "${{matrix.GEN}}"
-        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic -Wno-format -m64"
-        -D CMAKE_CXX_STANDARD=${{matrix.STD}}
+        -D CMAKE_CXX_STANDARD=${{matrix.CXXSTD}}
         -D CMAKE_CXX_EXTENSIONS=OFF
         -D CMAKE_CXX_STANDARD_REQUIRED=ON
         -D CMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/external/OpenCL-Headers/install;$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install;$GITHUB_WORKSPACE/install"
@@ -839,7 +800,7 @@ jobs:
     strategy:
       matrix:
         ABI:
-        # - arm64-v8a
+        - arm64-v8a
         - x86_64
         API_LEVEL:
         - android-19
@@ -847,6 +808,9 @@ jobs:
         CONFIG:
         - Debug
         - Release
+    env:
+      CFLAGS: -Wall -Wextra -pedantic -Werror
+      CXXFLAGS: -Wall -Wextra -pedantic -Werror
     steps:
     - name: Checkout OpenCL-CLHPP
       uses: actions/checkout@v3
@@ -870,7 +834,6 @@ jobs:
       run: cmake
         -G "Unix Makefiles"
         -D CMAKE_BUILD_TYPE=${{matrix.CONFIG}}
-        -D CMAKE_C_FLAGS="-Wall -Wextra -pedantic -Werror"
         -D CMAKE_C_EXTENSIONS=OFF
         -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-Headers/install
         -D BUILD_TESTING=OFF
@@ -886,7 +849,6 @@ jobs:
       run:  cmake
         -G "Unix Makefiles"
         -D CMAKE_BUILD_TYPE=${{matrix.CONFIG}}
-        -D CMAKE_C_FLAGS="-Wall -Wextra -pedantic -Werror"
         -D CMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/external/OpenCL-ICD-Loader/install
         -D BUILD_TESTING=ON
         -D CMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake
@@ -909,7 +871,6 @@ jobs:
         -D BUILD_TESTING=ON
         -D BUILD_EXAMPLES=ON
         -D CMAKE_BUILD_TYPE=${{matrix.CONFIG}}
-        -D CMAKE_CXX_FLAGS="-Wall -Wextra -pedantic"
         -D CMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake
         -D ANDROID_ABI=${{matrix.ABI}}
         -D ANDROID_PLATFORM=${{matrix.API_LEVEL}}
