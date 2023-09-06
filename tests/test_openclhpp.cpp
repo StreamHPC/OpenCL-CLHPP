@@ -272,28 +272,27 @@ static cl_int clGetPlatformInfo_version_3_0(
 class RefcountTable
 {
 private:
-    size_t n; // number of objects
-    void * const *objects; // object IDs
-    int *refcounts;        // current refcounts
+    size_t n_; // number of objects
+    void *const *objects_; // object IDs
+    int *refcounts_; // current refcounts
 
     size_t find(void *object)
     {
         size_t idx = 0;
-        while (idx < n && objects[idx] != object)
-            idx++;
-        TEST_ASSERT(idx < n);
-        TEST_ASSERT(refcounts[idx] > 0); // otherwise object has been destroyed
+        while (idx < n_ && objects_[idx] != object) idx++;
+        TEST_ASSERT(idx < n_);
+        TEST_ASSERT(refcounts_[idx] > 0); // otherwise object has been destroyed
         return idx;
     }
 
 public:
-    RefcountTable() : n(0), objects(nullptr), refcounts(nullptr) {}
+    RefcountTable(): n_(0), objects_(nullptr), refcounts_(nullptr) {}
 
-    void init(size_t n, void * const *objects, int *refcounts)
+    void init(size_t n, void *const *objects, int *refcounts)
     {
-        this->n = n;
-        this->objects = objects;
-        this->refcounts = refcounts;
+        this->n_ = n;
+        this->objects_ = objects;
+        this->refcounts_ = refcounts;
     }
 
     void reset()
@@ -304,14 +303,14 @@ public:
     cl_int retain(void *object)
     {
         size_t idx = find(object);
-        ++refcounts[idx];
+        ++refcounts_[idx];
         return CL_SUCCESS;
     }
 
     cl_int release(void *object)
     {
         size_t idx = find(object);
-        --refcounts[idx];
+        --refcounts_[idx];
         return CL_SUCCESS;
     }
 };
@@ -1195,7 +1194,7 @@ static cl_mem clCreateBuffer_testBufferConstructorContextIterator(
     (void) num_calls;
 
     TEST_ASSERT_EQUAL_PTR(make_context(0), context);
-    TEST_ASSERT_BITS(CL_MEM_COPY_HOST_PTR, flags, !CL_MEM_COPY_HOST_PTR);
+    TEST_ASSERT_BITS(CL_MEM_COPY_HOST_PTR, flags, CL_MEM_COPY_HOST_PTR != 0);
     TEST_ASSERT_BITS(CL_MEM_READ_ONLY, flags, CL_MEM_READ_ONLY);
     TEST_ASSERT_EQUAL(sizeof(int)*1024, size);
     TEST_ASSERT_NULL(host_ptr);
@@ -1305,6 +1304,7 @@ void testBufferConstructorQueueIterator(void)
     clReleaseCommandQueue_ExpectAndReturn(make_command_queue(0), CL_SUCCESS);
 }
 
+#if CL_HPP_TARGET_OPENCL_VERSION >= 300
 static cl_mem clCreateBufferWithProperties_testBufferWithProperties(
     cl_context context,
     const cl_mem_properties *properties,
@@ -1326,6 +1326,7 @@ static cl_mem clCreateBufferWithProperties_testBufferWithProperties(
 
     return make_mem(0);
 }
+#endif
 
 void testBufferWithProperties(void)
 {
@@ -1782,7 +1783,7 @@ void testKernelSetArgLocal(void)
     kernelPool[0].setArg(2, cl::Local(123));
 }
 
-void testKernelSetArgBySetKernelArgSVMPointerWithUniquePtrType()
+void testKernelSetArgBySetKernelArgSVMPointerWithUniquePtrType(void)
 {
 #if CL_HPP_TARGET_OPENCL_VERSION >= 200
     std::unique_ptr<int> buffer(new int(1000));
@@ -1791,7 +1792,7 @@ void testKernelSetArgBySetKernelArgSVMPointerWithUniquePtrType()
 #endif
 }
 
-void testKernelSetArgBySetKernelArgSVMPointerWithVectorType()
+void testKernelSetArgBySetKernelArgSVMPointerWithVectorType(void)
 {
 #if CL_HPP_TARGET_OPENCL_VERSION >= 200
     VECTOR_CLASS<int> vec(1000);
@@ -1800,7 +1801,7 @@ void testKernelSetArgBySetKernelArgSVMPointerWithVectorType()
 #endif
 }
 
-void testKernelSetArgBySetKernelArgSVMPointerWithPointerType()
+void testKernelSetArgBySetKernelArgSVMPointerWithPointerType(void)
 {
 #if CL_HPP_TARGET_OPENCL_VERSION >= 200
     cl_mem *memory = &bufferPool[1]();
@@ -2621,7 +2622,6 @@ static cl_int clGetKernelSubGroupInfo_testSubGroups(cl_kernel kernel,
     }
     else {
         TEST_ABORT();
-        return CL_INVALID_OPERATION;
     }
 }
 #endif
@@ -3191,7 +3191,8 @@ static cl_int clGetDeviceInfo_uuid_pci_bus_info(
                 (param_name == CL_DEVICE_UUID_KHR) ? 1 :
                 (param_name == CL_DRIVER_UUID_KHR) ? 2 :
                 0;
-            for (int i = 0; i < CL_UUID_SIZE_KHR; i++) {
+            for (cl_uchar i = 0; i < CL_UUID_SIZE_KHR; i++)
+            {
                 pUUID[i] = i + start;
             }
         }
@@ -3215,7 +3216,8 @@ static cl_int clGetDeviceInfo_uuid_pci_bus_info(
         if (param_value_size == CL_LUID_SIZE_KHR && param_value) {
             cl_uchar* pLUID = static_cast<cl_uchar*>(param_value);
             cl_uchar start = 3;
-            for (int i = 0; i < CL_LUID_SIZE_KHR; i++) {
+            for (cl_uchar i = 0; i < CL_LUID_SIZE_KHR; i++)
+            {
                 pLUID[i] = i + start;
             }
         }
@@ -3507,7 +3509,8 @@ void testMoveAssignSemaphoreNonNull(void);
 void testMoveAssignSemaphoreNull(void);
 void testMoveConstructSemaphoreNonNull(void);
 void testMoveConstructSemaphoreNull(void);
-MAKE_MOVE_TESTS(Semaphore, make_semaphore_khr, clReleaseSemaphoreKHR, semaphorePool);
+MAKE_MOVE_TESTS(Semaphore, make_semaphore_khr, clReleaseSemaphoreKHR,
+                semaphorePool)
 #else
 void testMoveAssignSemaphoreNonNull(void) {}
 void testMoveAssignSemaphoreNull(void) {}
@@ -3645,16 +3648,14 @@ void testSemaphoreWithProperties(void)
 }
 
 static cl_int clGetSemaphoreInfoKHR_testSemaphoreGetContext(
-    cl_semaphore_khr sema_object,
-    cl_semaphore_info_khr param_name,
-    size_t param_value_size,
-    void* param_value,
-    size_t* param_value_size_ret,
-    int num_calls)
+    cl_semaphore_khr sema_object, cl_semaphore_info_khr param_name,
+    size_t param_value_size, void *param_value, size_t *param_value_size_ret,
+    int /*num_calls*/)
 {
     TEST_ASSERT_EQUAL_PTR(semaphorePool[0](), sema_object);
     TEST_ASSERT_EQUAL_HEX(CL_SEMAPHORE_CONTEXT_KHR, param_name);
-    TEST_ASSERT(param_value == nullptr || param_value_size >= sizeof(cl_context));
+    TEST_ASSERT(param_value == nullptr
+                || param_value_size >= sizeof(cl_context));
     if (param_value_size_ret != nullptr)
         *param_value_size_ret = sizeof(cl_context);
     if (param_value != nullptr)
@@ -3679,12 +3680,9 @@ void testSemaphoreGetInfoContext(void)
 }
 
 static cl_int clGetSemaphoreInfoKHR_testSemaphoreGetReferenceCount(
-    cl_semaphore_khr sema_object,
-    cl_semaphore_info_khr param_name,
-    size_t param_value_size,
-    void* param_value,
-    size_t* param_value_size_ret,
-    int num_calls)
+    cl_semaphore_khr sema_object, cl_semaphore_info_khr param_name,
+    size_t param_value_size, void *param_value, size_t *param_value_size_ret,
+    int /*num_calls*/)
 {
     TEST_ASSERT_EQUAL_PTR(semaphorePool[0](), sema_object);
     TEST_ASSERT_EQUAL_HEX(CL_SEMAPHORE_REFERENCE_COUNT_KHR, param_name);
@@ -3710,24 +3708,24 @@ void testSemaphoreGetInfoReferenceCount(void)
 }
 
 static cl_int clGetSemaphoreInfoKHR_testSemaphoreGetProperties(
-    cl_semaphore_khr sema_object,
-    cl_semaphore_info_khr param_name,
-    size_t param_value_size,
-    void* param_value,
-    size_t* param_value_size_ret,
-    int num_calls)
+    cl_semaphore_khr sema_object, cl_semaphore_info_khr param_name,
+    size_t param_value_size, void *param_value, size_t *param_value_size_ret,
+    int /*num_calls*/)
 {
-    static const cl_semaphore_properties_khr test_properties[] =
-        {CL_SEMAPHORE_TYPE_KHR,
-         CL_SEMAPHORE_TYPE_BINARY_KHR};
+    static const cl_semaphore_properties_khr test_properties[] = {
+        CL_SEMAPHORE_TYPE_KHR, CL_SEMAPHORE_TYPE_BINARY_KHR
+    };
     TEST_ASSERT_EQUAL_PTR(semaphorePool[0](), sema_object);
     TEST_ASSERT_EQUAL_HEX(CL_SEMAPHORE_PROPERTIES_KHR, param_name);
-    TEST_ASSERT(param_value == nullptr || param_value_size >= sizeof(test_properties));
+    TEST_ASSERT(param_value == nullptr
+                || param_value_size >= sizeof(test_properties));
     if (param_value_size_ret != nullptr)
         *param_value_size_ret = sizeof(test_properties);
     if (param_value != nullptr) {
-        static_cast<cl_semaphore_properties_khr *>(param_value)[0] = test_properties[0];
-        static_cast<cl_semaphore_properties_khr *>(param_value)[1] = test_properties[1];
+        static_cast<cl_semaphore_properties_khr *>(param_value)[0] =
+            test_properties[0];
+        static_cast<cl_semaphore_properties_khr *>(param_value)[1] =
+            test_properties[1];
     }
 
     return CL_SUCCESS;
@@ -3748,20 +3746,19 @@ void testSemaphoreGetInfoProperties(void)
 }
 
 static cl_int clGetSemaphoreInfoKHR_testSemaphoreGetType(
-    cl_semaphore_khr sema_object,
-    cl_semaphore_info_khr param_name,
-    size_t param_value_size,
-    void* param_value,
-    size_t* param_value_size_ret,
-    int num_calls)
+    cl_semaphore_khr sema_object, cl_semaphore_info_khr param_name,
+    size_t param_value_size, void *param_value, size_t *param_value_size_ret,
+    int /*num_calls*/)
 {
     TEST_ASSERT_EQUAL_PTR(semaphorePool[0](), sema_object);
     TEST_ASSERT_EQUAL_HEX(CL_SEMAPHORE_TYPE_KHR, param_name);
-    TEST_ASSERT(param_value == nullptr || param_value_size >= sizeof(cl_semaphore_type_khr));
+    TEST_ASSERT(param_value == nullptr
+                || param_value_size >= sizeof(cl_semaphore_type_khr));
     if (param_value_size_ret != nullptr)
         *param_value_size_ret = sizeof(cl_semaphore_type_khr);
     if (param_value != nullptr)
-        *static_cast<cl_semaphore_type_khr *>(param_value) = CL_SEMAPHORE_TYPE_BINARY_KHR;
+        *static_cast<cl_semaphore_type_khr *>(param_value) =
+            CL_SEMAPHORE_TYPE_BINARY_KHR;
 
     return CL_SUCCESS;
 }
@@ -3779,16 +3776,14 @@ void testSemaphoreGetInfoType(void)
 }
 
 static cl_int clGetSemaphoreInfoKHR_testSemaphoreGetPayload(
-    cl_semaphore_khr sema_object,
-    cl_semaphore_info_khr param_name,
-    size_t param_value_size,
-    void* param_value,
-    size_t* param_value_size_ret,
-    int num_calls)
+    cl_semaphore_khr sema_object, cl_semaphore_info_khr param_name,
+    size_t param_value_size, void *param_value, size_t *param_value_size_ret,
+    int /*num_calls*/)
 {
     TEST_ASSERT_EQUAL_PTR(semaphorePool[0](), sema_object);
     TEST_ASSERT_EQUAL_HEX(CL_SEMAPHORE_PAYLOAD_KHR, param_name);
-    TEST_ASSERT(param_value == nullptr || param_value_size >= sizeof(cl_semaphore_payload_khr));
+    TEST_ASSERT(param_value == nullptr
+                || param_value_size >= sizeof(cl_semaphore_payload_khr));
     if (param_value_size_ret != nullptr)
         *param_value_size_ret = sizeof(cl_semaphore_payload_khr);
     if (param_value != nullptr)
@@ -3810,18 +3805,16 @@ void testSemaphoreGetInfoPayload(void)
 }
 
 static cl_int clGetSemaphoreInfoKHR_testSemaphoreGetDevices(
-    cl_semaphore_khr sema_object,
-    cl_semaphore_info_khr param_name,
-    size_t param_value_size,
-    void* param_value,
-    size_t* param_value_size_ret,
-    int num_calls)
+    cl_semaphore_khr sema_object, cl_semaphore_info_khr param_name,
+    size_t param_value_size, void *param_value, size_t *param_value_size_ret,
+    int /*num_calls*/)
 {
-    static const cl_device_id test_devices[] =
-        {make_device_id(0), make_device_id(1)};
+    static const cl_device_id test_devices[] = { make_device_id(0),
+                                                 make_device_id(1) };
     TEST_ASSERT_EQUAL_PTR(semaphorePool[0](), sema_object);
     TEST_ASSERT_EQUAL_HEX(CL_DEVICE_HANDLE_LIST_KHR, param_name);
-    TEST_ASSERT(param_value == nullptr || param_value_size >= sizeof(test_devices));
+    TEST_ASSERT(param_value == nullptr
+                || param_value_size >= sizeof(test_devices));
     if (param_value_size_ret != nullptr)
         *param_value_size_ret = sizeof(test_devices);
     if (param_value != nullptr) {
@@ -3898,16 +3891,12 @@ static int make_external_semaphore_fd(
 }
 
 static cl_int clGetSemaphoreHandleForTypeKHR_GetHandles(
-    cl_semaphore_khr sema_object,
-    cl_device_id device,
-    cl_external_semaphore_handle_type_khr handle_type,
-    size_t handle_size,
-    void* handle_ptr,
-    size_t* handle_size_ret,
-    int num_calls)
+    cl_semaphore_khr sema_object, cl_device_id device,
+    cl_external_semaphore_handle_type_khr handle_type, size_t handle_size,
+    void *handle_ptr, size_t *handle_size_ret, int /*num_calls*/)
 {
-    (void) sema_object;
-    (void) device;
+    (void)sema_object;
+    (void)device;
 
     switch (handle_type) {
 #if defined(cl_khr_external_semaphore_dx_fence)
@@ -3973,7 +3962,7 @@ static cl_int clGetSemaphoreHandleForTypeKHR_GetHandles(
     return CL_INVALID_OPERATION;
 }
 
-void testTemplateGetSemaphoreHandleForTypeKHR()
+void testTemplateGetSemaphoreHandleForTypeKHR(void)
 {
     clGetDeviceInfo_StubWithCallback(clGetDeviceInfo_platform);
     clGetPlatformInfo_StubWithCallback(clGetPlatformInfo_version_2_0);
@@ -3981,7 +3970,8 @@ void testTemplateGetSemaphoreHandleForTypeKHR()
 
     cl::Device device(make_device_id(0));
 
-    clGetSemaphoreHandleForTypeKHR_StubWithCallback(clGetSemaphoreHandleForTypeKHR_GetHandles);
+    clGetSemaphoreHandleForTypeKHR_StubWithCallback(
+        clGetSemaphoreHandleForTypeKHR_GetHandles);
 
     cl::Semaphore semaphore;
 #if defined(cl_khr_external_semaphore_dx_fence)
