@@ -1,6 +1,5 @@
 :cmock:
   :includes:
-    - stdlib.h
     - CL/cl_platform.h
   :treat_externs: :include
   :enforce_strict_ordering: :true
