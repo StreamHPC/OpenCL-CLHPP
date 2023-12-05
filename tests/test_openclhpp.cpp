@@ -3690,20 +3690,21 @@ void testDevice_GetInfo_CLDeviceName(void)
 #if defined(cl_ext_device_fission)
 static cl_int clCreateSubDevicesEXT_testDevice_createSubDevices(
     cl_device_id device_in, const cl_device_partition_property_ext *properties,
-    cl_uint n, cl_device_id *out_devices, cl_uint *num, int num_calls) {
-  cl_int ret = CL_SUCCESS;
-
-  TEST_ASSERT_EQUAL(CL_DEVICE_PARTITION_EQUALLY_EXT, *properties);
-  if(nullptr != out_devices){
-    out_devices[0] = make_device_id(0);
-  }
-  if (nullptr != num)
-  {
-      *num = 1;
-  }
-  if (device_in == make_device_id(0)) {
-    return CL_SUCCESS;
-  } else if (device_in == make_device_id(1)) {
+    cl_uint, cl_device_id *out_devices, cl_uint *num, int)
+{
+    TEST_ASSERT_EQUAL(CL_DEVICE_PARTITION_EQUALLY_EXT, *properties);
+    if (nullptr != out_devices)
+    {
+        out_devices[0] = make_device_id(0);
+    }
+    if (nullptr != num)
+    {
+        *num = 1;
+    }
+    if (device_in == make_device_id(0))
+    {
+        return CL_SUCCESS;
+    } else if (device_in == make_device_id(1)) {
     return CL_INVALID_DEVICE;
   } else {
     return CL_SUCCESS;
