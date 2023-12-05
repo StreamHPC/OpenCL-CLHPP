@@ -3704,11 +3704,15 @@ static cl_int clCreateSubDevicesEXT_testDevice_createSubDevices(
     if (device_in == make_device_id(0))
     {
         return CL_SUCCESS;
-    } else if (device_in == make_device_id(1)) {
-    return CL_INVALID_DEVICE;
-  } else {
-    return CL_SUCCESS;
-  }
+    }
+    else if (device_in == make_device_id(1))
+    {
+        return CL_INVALID_DEVICE;
+    }
+    else
+    {
+        return CL_SUCCESS;
+    }
 }
 
 void testDevice_createSubDevices() {
